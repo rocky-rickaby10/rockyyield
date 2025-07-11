@@ -2059,6 +2059,20 @@ function isNumber(...)
 	return not not tonumber(...)
 end
 
+function cleanPos(args)
+	if #args ~= 3 then return end
+
+	local pos = {}
+	for _, v in ipairs(args) do
+		local num = tonumber((v:gsub(",", "")))
+		if not num then return end
+
+		table.insert(pos, num)
+	end
+	return unpack(pos)
+end
+
+
 function getRoot(char)
 	return char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Torso') or char:FindFirstChild('UpperTorso')
 end
@@ -4499,6 +4513,7 @@ CMDs[#CMDs + 1] = {NAME = 'allowrejoin / allowrj [true/false] (CLIENT)', DESC = 
 CMDs[#CMDs + 1] = {NAME = 'cancelteleport / canceltp', DESC = 'Cancels teleports in progress'}
 CMDs[#CMDs + 1] = {NAME = 'volume / vol [0-10]', DESC = 'Adjusts your game volume on a scale of 0 to 10'}
 CMDs[#CMDs + 1] = {NAME = 'antilag / boostfps / lowgraphics', DESC = 'Lowers game quality to boost FPS'}
+CMDs[#CMDs + 1] = {NAME = 'setfpscap / fpscap [fps]', DESC = 'Limits your max FPS to the provided number'}
 CMDs[#CMDs + 1] = {NAME = 'record / rec', DESC = 'Starts roblox recorder'}
 CMDs[#CMDs + 1] = {NAME = 'screenshot / scrnshot', DESC = 'Takes a screenshot'}
 CMDs[#CMDs + 1] = {NAME = 'togglefullscreen / togglefs', DESC = 'Toggles fullscreen'}
@@ -4709,7 +4724,7 @@ CMDs[#CMDs + 1] = {NAME = 'flyfling [speed]', DESC = 'Basically the invisfling c
 CMDs[#CMDs + 1] = {NAME = 'unflyfling', DESC = 'Disables the flyfling command'}
 CMDs[#CMDs + 1] = {NAME = 'walkfling', DESC = 'Basically fling but no spinning'}
 CMDs[#CMDs + 1] = {NAME = 'unwalkfling / nowalkfling', DESC = 'Disables walkfling'}
-CMDs[#CMDs + 1] = {NAME = 'invisfling', DESC = 'Enables invisible fling'}
+CMDs[#CMDs + 1] = {NAME = 'invisfling', DESC = 'Enables invisible fling (partially patched, no longer invisible)'}
 CMDs[#CMDs + 1] = {NAME = 'antifling', DESC = 'Disables player collisions to prevent you from being flung'}
 CMDs[#CMDs + 1] = {NAME = 'unantifling', DESC = 'Disables antifling'}
 CMDs[#CMDs + 1] = {NAME = 'muteboombox [player]', DESC = 'Mutes someones boombox'}
@@ -4825,6 +4840,7 @@ CMDs[#CMDs + 1] = {NAME = 'deleteselectedtool / dst', DESC = 'Removes any curren
 CMDs[#CMDs + 1] = {NAME = 'grabtools', DESC = 'Automatically get tools that are dropped'}
 CMDs[#CMDs + 1] = {NAME = 'ungrabtools / nograbtools', DESC = 'Disables grabtools'}
 CMDs[#CMDs + 1] = {NAME = 'copytools [player] (CLIENT)', DESC = 'Copies a players tools'}
+CMDs[#CMDs + 1] = {NAME = 'notifytools / ntools [player]', DESC = 'Notifies you a list of the player\'s current tools'}
 CMDs[#CMDs + 1] = {NAME = 'dupetools / clonetools [num]', DESC = 'Duplicates your inventory tools a set amount of times'}
 CMDs[#CMDs + 1] = {NAME = 'droptools', DESC = 'Drops your tools'}
 CMDs[#CMDs + 1] = {NAME = 'droppabletools', DESC = 'Makes your tools droppable'}
@@ -4868,7 +4884,8 @@ CMDs[#CMDs + 1] = {NAME = 'unalignmentkeys / noalignmentkeys', DESC = 'Disables 
 CMDs[#CMDs + 1] = {NAME = 'ctrllock', DESC = 'Binds Shiftlock to LeftControl'}
 CMDs[#CMDs + 1] = {NAME = 'unctrllock', DESC = 'Re-binds Shiftlock to LeftShift'}
 CMDs[#CMDs + 1] = {NAME = 'listento [player]', DESC = 'Listens to the area around a player. Can also eavesdrop with vc'}
-CMDs[#CMDs + 1] = {NAME = 'unlistento', DESC = 'Disables listento'}
+CMDs[#CMDs + 1] = {NAME = 'listentopos [X Y Z]', DESC = 'Listens to the area around a certain position'}
+CMDs[#CMDs + 1] = {NAME = 'unlistento', DESC = 'Disables listento / listentopos'}
 CMDs[#CMDs + 1] = {NAME = 'jerk', DESC = 'Makes you jork it'}
 CMDs[#CMDs + 1] = {NAME = 'unsuspendvc', DESC = 'Unsuspends you from voice chat'}
 wait()
@@ -4935,10 +4952,12 @@ function checkTT()
 end
 
 function FindInTable(tbl,val)
-	if tbl == nil then return false end
-	for _,v in pairs(tbl) do
-		if v == val then return true end
-	end 
+	if tbl ~= nil then
+		for _,v in pairs(tbl) do
+			if v == val then return true end
+		end
+	end
+
 	return false
 end
 
@@ -8439,9 +8458,7 @@ addcmd('freecam',{'fc'},function(args, speaker)
 end)
 
 addcmd('freecampos',{'fcpos','fcp','freecamposition','fcposition'},function(args, speaker)
-	if not args[1] then return end
-	local freecamPos = CFrame.new(args[1],args[2],args[3])
-	StartFreecam(freecamPos)
+	StartFreecam(cleanPos(args))
 end)
 
 addcmd('freecamwaypoint',{'fcwp'},function(args, speaker)
@@ -9327,12 +9344,8 @@ end)
 
 addcmd("reset", {}, function(args, speaker)
     local humanoid = speaker.Character and speaker.Character:FindFirstChildWhichIsA("Humanoid")
-    if replicatesignal then
-        replicatesignal(speaker.Kill)
-    elseif humanoid then
+    if humanoid then
         humanoid:ChangeState(Enum.HumanoidStateType.Dead)
-    else
-        speaker.Character:BreakJoints()
     end
 end)
 
@@ -9556,25 +9569,21 @@ addcmd('toolinvisible',{'toolinvis','tinvis'},function(args, speaker)
 end)
 
 addcmd("strengthen", {}, function(args, speaker)
+	if not tonumber(args[1]) then return end
+
 	for _, child in pairs(speaker.Character:GetDescendants()) do
 		if child.ClassName == "Part" then
-			if args[1] then
-				child.CustomPhysicalProperties = PhysicalProperties.new(args[1], 0.3, 0.5)
-			else
-				child.CustomPhysicalProperties = PhysicalProperties.new(100, 0.3, 0.5)
-			end
+			child.CustomPhysicalProperties = PhysicalProperties.new((args[1] or 100), 0.3, 0.5)
 		end
 	end
 end)
 
 addcmd("weaken", {}, function(args, speaker)
+	if not tonumber(args[1]) then return end
+
 	for _, child in pairs(speaker.Character:GetDescendants()) do
 		if child.ClassName == "Part" then
-			if args[1] then
-				child.CustomPhysicalProperties = PhysicalProperties.new(-args[1], 0.3, 0.5)
-			else
-				child.CustomPhysicalProperties = PhysicalProperties.new(0, 0.3, 0.5)
-			end
+			child.CustomPhysicalProperties = PhysicalProperties.new((-args[1] or 0), 0.3, 0.5)
 		end
 	end
 end)
@@ -9653,6 +9662,7 @@ addcmd("undance", {"nodance"}, function(args, speaker)
 end)
 
 addcmd('nolimbs',{'rlimbs'},function(args, speaker)
+	if rcdEnabled() then notify('RejectCharacterDeletions', 'Due to RejectCharacterDeletions being enabled in this game, this command will only be visible to you') end
 	if r15(speaker) then
 		for i,v in pairs(speaker.Character:GetChildren()) do
 			if v:IsA("BasePart") and
@@ -9677,6 +9687,7 @@ addcmd('nolimbs',{'rlimbs'},function(args, speaker)
 end)
 
 addcmd('noarms',{'rarms'},function(args, speaker)
+	if rcdEnabled() then notify('RejectCharacterDeletions', 'Due to RejectCharacterDeletions being enabled in this game, this command will only be visible to you') end
 	if r15(speaker) then
 		for i,v in pairs(speaker.Character:GetChildren()) do
 			if v:IsA("BasePart") and
@@ -9697,6 +9708,7 @@ addcmd('noarms',{'rarms'},function(args, speaker)
 end)
 
 addcmd('nolegs',{'rlegs'},function(args, speaker)
+	if rcdEnabled() then notify('RejectCharacterDeletions', 'Due to RejectCharacterDeletions being enabled in this game, this command will only be visible to you') end
 	if r15(speaker) then
 		for i,v in pairs(speaker.Character:GetChildren()) do
 			if v:IsA("BasePart") and
@@ -10073,45 +10085,34 @@ addcmd('loopanimation', {'loopanim'},function(args, speaker)
 end)
 
 addcmd('tpposition',{'tppos'},function(args, speaker)
-	if #args < 3 then return end
-	local tpX,tpY,tpZ = tonumber((args[1]:gsub(",", ""))),tonumber((args[2]:gsub(",", ""))),tonumber((args[3]:gsub(",", "")))
 	local char = speaker.Character
 	if char and getRoot(char) then
-		getRoot(char).CFrame = CFrame.new(tpX,tpY,tpZ)
+		getRoot(char).CFrame = CFrame.new(cleanPos(args))
 	end
 end)
 
 addcmd('tweentpposition',{'ttppos'},function(args, speaker)
-	if #args < 3 then return end
-	local tpX,tpY,tpZ = tonumber((args[1]:gsub(",", ""))),tonumber((args[2]:gsub(",", ""))),tonumber((args[3]:gsub(",", "")))
 	local char = speaker.Character
 	if char and getRoot(char) then
-		TweenService:Create(getRoot(speaker.Character), TweenInfo.new(tweenSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(tpX,tpY,tpZ)}):Play()
+		TweenService:Create(getRoot(speaker.Character), TweenInfo.new(tweenSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(cleanPos(args))}):Play()
 	end
 end)
 
 addcmd('offset',{},function(args, speaker)
-	if #args < 3 then
-		return 
-	end
 	if speaker.Character then
-		speaker.Character:TranslateBy(Vector3.new(tonumber(args[1]) or 0, tonumber(args[2]) or 0, tonumber(args[3]) or 0))
+		speaker.Character:TranslateBy(Vector3.new(cleanPos(args)))
 	end
 end)
 
 addcmd('tweenoffset',{'toffset'},function(args, speaker)
-	if #args < 3 then return end
-	local tpX,tpY,tpZ = tonumber(args[1]),tonumber(args[2]),tonumber(args[3])
 	local char = speaker.Character
 	if char and getRoot(char) then
-		TweenService:Create(getRoot(speaker.Character), TweenInfo.new(tweenSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(tpX,tpY,tpZ)}):Play()
+		TweenService:Create(getRoot(speaker.Character), TweenInfo.new(tweenSpeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(cleanPos(args))}):Play()
 	end
 end)
 
 addcmd('clickteleport',{},function(args, speaker)
-	if speaker == Players.LocalPlayer then
-		notify('Click TP','Go to Settings>Keybinds>Add to set up click tp')
-	end
+	notify('Click TP','Go to Settings>Keybinds>Add to set up click tp')
 end)
 
 addcmd("mouseteleport", {"mousetp"}, function(args, speaker)
@@ -10138,9 +10139,7 @@ addcmd('tptool', {'teleporttool'}, function(args, speaker)
 end)
 
 addcmd('clickdelete',{},function(args, speaker)
-	if speaker == Players.LocalPlayer then
-		notify('Click Delete','Go to Settings>Keybinds>Add to set up click delete')
-	end
+	notify('Click Delete','Go to Settings>Keybinds>Add to set up click delete')
 end)
 
 addcmd('getposition',{'getpos','notifypos','notifyposition'},function(args, speaker)
@@ -10172,24 +10171,21 @@ addcmd('copyposition',{'copypos'},function(args, speaker)
 end)
 
 addcmd('walktopos',{'walktoposition'},function(args, speaker)
-	if speaker.Character:FindFirstChildOfClass('Humanoid') and speaker.Character:FindFirstChildOfClass('Humanoid').SeatPart then
-		speaker.Character:FindFirstChildOfClass('Humanoid').Sit = false
-		wait(.1)
+	local humanoid = speaker.Character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
+
+	if humanoid.Sit then
+		humanoid.Sit = false
+		task.wait()
 	end
-	speaker.Character:FindFirstChildOfClass('Humanoid').WalkToPoint = Vector3.new(args[1],args[2],args[3])
+
+	humanoid.WalkToPoint = Vector3.new(cleanPos(args))
 end)
 
 addcmd('speed',{'ws','walkspeed'},function(args, speaker)
-	if args[2] then
-		local speed = args[2] or 16
-		if isNumber(speed) then
-			speaker.Character:FindFirstChildOfClass('Humanoid').WalkSpeed = speed
-		end
-	else
-		local speed = args[1] or 16
-		if isNumber(speed) then
-			speaker.Character:FindFirstChildOfClass('Humanoid').WalkSpeed = speed
-		end
+	local speed = args[2] or args[1]
+	if speed == nil or tonumber(speed) then
+		speaker.Character:FindFirstChildOfClass('Humanoid').WalkSpeed = speed or 16
 	end
 end)
 
@@ -10327,14 +10323,31 @@ addcmd('tools',{'gears'},function(args, speaker)
 	notify('Tools','Copied tools from ReplicatedStorage and Lighting')
 end)
 
+addcmd('notifytools', {'ntools'}, function(args, speaker)
+	local plr = Players[getPlayer(args[1], speaker)[1]]
+	local tools = {}
+
+	for _, v in ipairs(plr.Backpack:GetChildren()) do
+		if v:IsA("BackpackItem") then table.insert(tools, v.Name) end
+	end
+
+	if plr.Character then
+		for _, v in ipairs(plr.Character:GetChildren()) do
+			if v:IsA("BackpackItem") then table.insert(tools, v.Name) end
+		end
+	end
+
+	notify(plr.Name.."'s Tools", table.concat(tools, ", "))
+end)
+
 addcmd('notools',{'rtools','clrtools','removetools','deletetools','dtools'},function(args, speaker)
 	for i,v in pairs(speaker:FindFirstChildOfClass("Backpack"):GetDescendants()) do
-		if v:IsA('Tool') or v:IsA('HopperBin') then
+		if v:IsA('BackpackItem') then
 			v:Destroy()
 		end
 	end
 	for i,v in pairs(speaker.Character:GetDescendants()) do
-		if v:IsA('Tool') or v:IsA('HopperBin') then
+		if v:IsA('BackpackItem') then
 			v:Destroy()
 		end
 	end
@@ -10342,7 +10355,7 @@ end)
 
 addcmd('deleteselectedtool',{'dst'},function(args, speaker)
 	for i,v in pairs(speaker.Character:GetDescendants()) do
-		if v:IsA('Tool') or v:IsA('HopperBin') then
+		if v:IsA('BackpackItem') then
 			v:Destroy()
 		end
 	end
@@ -10533,7 +10546,6 @@ addcmd('chat',{'say'},function(args, speaker)
 	chatMessage(cString)
 end)
 
-
 spamming = false
 spamspeed = 1
 addcmd('spam',{},function(args, speaker)
@@ -10549,6 +10561,7 @@ addcmd('nospam',{'unspam'},function(args, speaker)
 end)
 
 addcmd('whisper',{'pm'},function(args, speaker)
+	-- Aware it's broken for TextChatService, will fix someday
 	local players = getPlayer(args[1], speaker)
 	for i,v in pairs(players)do
 		task.spawn(function()
@@ -10632,7 +10645,7 @@ end)
 
 addcmd('blocktool',{},function(args, speaker)
 	for _,v in pairs(speaker.Character:GetChildren()) do
-		if v:IsA("Tool") or v:IsA("HopperBin") then
+		if v:IsA("BackpackItem") then
 			for i,c in pairs(v:GetDescendants()) do
 				if c:IsA("SpecialMesh") then
 					c:Destroy()
@@ -11199,7 +11212,7 @@ end)
 
 addcmd('equiptools',{},function(args, speaker)
 	for i,v in pairs(speaker:FindFirstChildOfClass("Backpack"):GetChildren()) do
-		if v:IsA("Tool") or v:IsA("HopperBin") then
+		if v:IsA("BackpackItem") then
 			v.Parent = speaker.Character
 		end
 	end
@@ -11875,11 +11888,7 @@ addcmd('unfling',{'nofling'},function(args, speaker)
 end)
 
 addcmd('togglefling',{},function(args, speaker)
-	if flinging then
-		execCmd('unfling')
-	else
-		execCmd('fling')
-	end
+	execCmd(flinging and 'unfling' or 'fling')
 end)
 
 addcmd("flyfling", {}, function(args, speaker)
@@ -11997,10 +12006,7 @@ addcmd('invisfling',{},function(args, speaker)
 end)
 
 addcmd("antifling", {}, function(args, speaker)
-    if antifling then
-        antifling:Disconnect()
-        antifling = nil
-    end
+    execCmd('unantifling')
     antifling = RunService.Stepped:Connect(function()
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= speaker and player.Character then
@@ -12015,10 +12021,20 @@ addcmd("antifling", {}, function(args, speaker)
 end)
 
 addcmd("unantifling", {}, function(args, speaker)
-    if antifling then
+	if antifling then
         antifling:Disconnect()
         antifling = nil
     end
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= speaker and player.Character then
+			for _, v in ipairs(player.Character:GetDescendants()) do
+				if v:IsA("BasePart") and not table.find({"Accessory", "Tool"}, v.ClassName) then
+					v.CanCollide = true
+				end
+			end
+		end
+	end
 end)
 
 addcmd("toggleantifling", {}, function(args, speaker)
@@ -12129,7 +12145,9 @@ end)
 addcmd("loopxray", {}, function(args, speaker)
     if xrayLoop then
         xrayLoop:Disconnect()
+		xrayLoop = nil
     end
+
     xrayLoop = RunService.RenderStepped:Connect(function()
         xrayEnabled = true
         xray()
@@ -12205,7 +12223,11 @@ addcmd('unautoclick',{'noautoclick'},function(args, speaker)
 end)
 
 addcmd('mousesensitivity',{'ms'},function(args, speaker)
-	UserInputService.MouseDeltaSensitivity = args[1]
+	local GameSettings = cloneref(UserSettings():GetService("UserGameSettings"))
+
+	if tonumber(args[1]) then
+		UserInputService.MouseDeltaSensitivity = args[1] / GameSettings.MouseSensitivity
+	end
 end)
 
 local nameBox = nil
@@ -12446,7 +12468,7 @@ end)
 
 addcmd('destroyheight',{'dh'},function(args, speaker)
 	local dh = args[1] or -500
-	if isNumber(dh) then
+	if tonumber(dh) then
 		workspace.FallenPartsDestroyHeight = dh
 	end
 end)
@@ -12595,9 +12617,17 @@ addcmd("listento", {}, function(args, speaker)
     end
 end)
 
+addcmd("listentopos", {}, function(args, speaker)
+	SoundService:SetListener(Enum.ListenerType.CFrame, cleanPos(args))
+end)
+
 addcmd("unlistento", {}, function(args, speaker)
     SoundService:SetListener(Enum.ListenerType.Camera)
-    listentoChar:Disconnect()
+
+	if listentoChar then
+    	listentoChar:Disconnect()
+		listentoChar = nil
+	end
 end)
 
 addcmd("jerk", {}, function(args, speaker)
@@ -13122,11 +13152,6 @@ CaptureService.CaptureEnded:Connect(function()
     task.delay(0.1, function()
         PARENT.Enabled = true
     end)
-end)
-
-pcall(function()
-	setfflag("AbuseReportScreenshot", "False")
-	setfflag("AbuseReportScreenshotPercentage", "0")
 end)
 
 task.spawn(function()
